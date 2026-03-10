@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI SQL Assistant</title>
+  <style>
+    /* ── Base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #1c2330;
+      --border:      #30363d;
+      --accent:      #58a6ff;
+      --accent-dim:  #1f3a5f;
+      --green:       #3fb950;
+      --red:         #f85149;
+      --yellow:      #d29922;
+      --text:        #e6edf3;
+      --text-muted:  #8b949e;
+      --chip-bg:     #21262d;
+      --chip-hover:  #30363d;
+      --radius:      8px;
+      --font-mono:   "Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+
+    header {
+      padding: 32px 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header h1 .logo {
+      font-size: 1.4rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-size: 0.9rem;
+    }
+
+    /* ── Query input area ────────────────────────────────────────── */
+    .query-area {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    #question {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 12px 16px;
+      resize: vertical;
+      min-height: 52px;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+
+    #question:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.12);
+    }
+
+    #question::placeholder { color: var(--text-muted); }
+
+    #submit-btn {
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      border-radius: var(--radius);
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s, transform 0.1s;
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+
+    #submit-btn:hover { opacity: 0.88; }
+    #submit-btn:active { transform: scale(0.97); }
+    #submit-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* ── Example chips ───────────────────────────────────────────── */
+    .examples-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      background: var(--chip-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+
+    .chip:hover {
+      background: var(--chip-hover);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ── Divider ─────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 24px 0;
+    }
+
+    /* ── Loading state ───────────────────────────────────────────── */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      padding: 10px 0;
+    }
+
+    .status-bar.visible { display: flex; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── SQL pane ────────────────────────────────────────────────── */
+    .pane {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .pane-header .badge {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .pane-header .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .pane-header .copy-btn:hover {
+      background: var(--chip-hover);
+      color: var(--text);
+    }
+
+    .sql-code {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      line-height: 1.7;
+      padding: 18px 20px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #e6edf3;
+    }
+
+    /* Very basic SQL keyword highlighting */
+    .kw   { color: #ff7b72; font-weight: 600; }
+    .fn   { color: #d2a8ff; }
+    .str  { color: #a5d6ff; }
+    .num  { color: #79c0ff; }
+    .cmt  { color: var(--text-muted); font-style: italic; }
+    .alias{ color: var(--green); }
+
+    /* ── Results table ───────────────────────────────────────────── */
+    .results-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .results-meta .row-count {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    tbody td {
+      padding: 10px 16px;
+      color: var(--text);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    tbody td.num-cell {
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      color: #79c0ff;
+    }
+
+    /* ── Error box ───────────────────────────────────────────────── */
+    .error-box {
+      background: rgba(248, 81, 73, 0.08);
+      border: 1px solid rgba(248, 81, 73, 0.35);
+      border-radius: var(--radius);
+      color: var(--red);
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      display: none;
+    }
+
+    .error-box.visible { display: block; }
+
+    /* ── Empty / welcome state ───────────────────────────────────── */
+    .welcome {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--text-muted);
+    }
+
+    .welcome .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .welcome h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 6px; }
+    .welcome p  { font-size: 0.88rem; }
+
+    /* ── Schema panel (collapsible) ──────────────────────────────── */
+    details.schema-details {
+      margin-top: 8px;
+    }
+
+    details.schema-details summary {
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    details.schema-details summary::-webkit-details-marker { display: none; }
+    details.schema-details summary::before {
+      content: "▶";
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+    details[open].schema-details summary::before { transform: rotate(90deg); }
+
+    details.schema-details summary:hover { color: var(--text); }
+
+    .schema-body {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-top: 8px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1><span class="logo">🗄️</span> AI SQL Assistant</h1>
+    <p>Ask questions in plain English — Claude generates the SQL and runs it instantly.</p>
+  </header>
+
+  <!-- Query input -->
+  <div class="query-area">
+    <div class="input-row">
+      <textarea
+        id="question"
+        placeholder="e.g. Show me the top 5 customers by total spending"
+        rows="2"
+        autocomplete="off"
+        spellcheck="false"
+      ></textarea>
+      <button id="submit-btn" onclick="submitQuery()">Run Query</button>
+    </div>
+
+    <!-- Example chips -->
+    <div>
+      <div class="examples-label">Try an example</div>
+      <div class="chips" id="chips-container"></div>
+    </div>
+
+    <!-- Schema viewer -->
+    <details class="schema-details" id="schema-details">
+      <summary>View database schema</summary>
+      <pre class="schema-body" id="schema-body">Loading…</pre>
+    </details>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Status / loading -->
+  <div class="status-bar" id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-text">Generating SQL with Claude…</span>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- Results area -->
+  <div id="results-area">
+    <div class="welcome">
+      <div class="icon">✨</div>
+      <h2>Ask anything about the e-commerce data</h2>
+      <p>Customers · Products · Orders — 3 tables, 75+ rows of sample data</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let schema = "";
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadExamples(), loadSchema()]);
+  document.getElementById("question").addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitQuery();
+  });
+}
+
+async function loadExamples() {
+  try {
+    const res = await fetch("/examples");
+    const data = await res.json();
+    const container = document.getElementById("chips-container");
+    data.examples.forEach(ex => {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.textContent = ex;
+      chip.onclick = () => {
+        document.getElementById("question").value = ex;
+        submitQuery();
+      };
+      container.appendChild(chip);
+    });
+  } catch (e) {
+    console.error("Could not load examples", e);
+  }
+}
+
+async function loadSchema() {
+  try {
+    const res = await fetch("/schema");
+    const data = await res.json();
+    schema = data.schema;
+    document.getElementById("schema-body").textContent = schema;
+  } catch (e) {
+    document.getElementById("schema-body").textContent = "Could not load schema.";
+  }
+}
+
+// ── Submit ─────────────────────────────────────────────────────────────────
+async function submitQuery() {
+  const question = document.getElementById("question").value.trim();
+  if (!question) return;
+
+  setLoading(true);
+  clearError();
+  clearResults();
+
+  try {
+    const res = await fetch("/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showError(data.detail || "An error occurred.");
+      return;
+    }
+
+    if (data.error) {
+      renderSQL(data.sql);
+      showError(data.error);
+    } else {
+      renderSQL(data.sql);
+      renderResults(data.columns, data.results, data.row_count);
+    }
+  } catch (e) {
+    showError("Network error: " + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function setLoading(on) {
+  document.getElementById("submit-btn").disabled = on;
+  document.getElementById("status-bar").className = "status-bar" + (on ? " visible" : "");
+}
+
+function clearError() {
+  const box = document.getElementById("error-box");
+  box.className = "error-box";
+  box.textContent = "";
+}
+
+function showError(msg) {
+  const box = document.getElementById("error-box");
+  box.textContent = "⚠ " + msg;
+  box.className = "error-box visible";
+}
+
+function clearResults() {
+  document.getElementById("results-area").innerHTML = "";
+}
+
+// ── SQL rendering with basic syntax highlighting ───────────────────────────
+const KEYWORDS = [
+  "SELECT","FROM","WHERE","JOIN","LEFT","RIGHT","INNER","OUTER","ON","AND","OR",
+  "NOT","IN","LIKE","IS","NULL","AS","GROUP BY","ORDER BY","HAVING","LIMIT",
+  "OFFSET","DISTINCT","COUNT","SUM","AVG","MIN","MAX","CASE","WHEN","THEN",
+  "ELSE","END","WITH","UNION","ALL","BETWEEN","EXISTS","BY","DESC","ASC",
+  "GROUP","ORDER","CROSS","FULL",
+];
+
+function highlightSQL(sql) {
+  // Escape HTML first
+  let s = sql.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Comments
+  s = s.replace(/(--[^\n]*)/g, '<span class="cmt">$1</span>');
+
+  // String literals
+  s = s.replace(/'([^']*)'/g, "<span class=\"str\">'$1'</span>");
+
+  // Numbers
+  s = s.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>');
+
+  // Keywords (longest first to avoid partial matches)
+  const sorted = [...KEYWORDS].sort((a, b) => b.length - a.length);
+  sorted.forEach(kw => {
+    const re = new RegExp("\\b(" + kw.replace(" ", "\\s+") + ")\\b", "gi");
+    s = s.replace(re, '<span class="kw">$1</span>');
+  });
+
+  // Function calls like COUNT( — highlight function name
+  s = s.replace(/\b([A-Z_][A-Z0-9_]*)\s*\(/gi, (m, fn) => {
+    if (KEYWORDS.includes(fn.toUpperCase())) return m;
+    return `<span class="fn">${fn}</span>(`;
+  });
+
+  return s;
+}
+
+function renderSQL(sql) {
+  if (!sql) return;
+  const area = document.getElementById("results-area");
+  const pane = document.createElement("div");
+  pane.className = "pane";
+  pane.innerHTML = `
+    <div class="pane-header">
+      <span>Generated SQL</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge">Claude</span>
+        <button class="copy-btn" onclick="copySQL(this)">Copy</button>
+      </div>
+    </div>
+    <pre class="sql-code" id="sql-display">${highlightSQL(sql)}</pre>
+  `;
+  pane.querySelector(".copy-btn")._sql = sql;
+  area.appendChild(pane);
+}
+
+function copySQL(btn) {
+  navigator.clipboard.writeText(btn._sql).then(() => {
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+  });
+}
+
+// ── Results table ──────────────────────────────────────────────────────────
+function isNumeric(v) {
+  return typeof v === "number" || (typeof v === "string" && v !== "" && !isNaN(Number(v)));
+}
+
+function formatCell(v) {
+  if (v === null || v === undefined) return '<span style="color:var(--text-muted)">NULL</span>';
+  if (typeof v === "number") {
+    // Format currency-like numbers
+    if (Math.abs(v) >= 0.01 && String(v).includes(".")) {
+      return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return v.toLocaleString("en-US");
+  }
+  return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderResults(columns, rows, rowCount) {
+  const area = document.getElementById("results-area");
+
+  const pane = document.createElement("div");
+  pane.className = "pane";
+
+  const badge = rowCount > 0
+    ? `<span class="row-count">${rowCount} row${rowCount !== 1 ? "s" : ""}</span>`
+    : '<span style="color:var(--text-muted)">No results</span>';
+
+  if (rowCount === 0) {
+    pane.innerHTML = `
+      <div class="pane-header">
+        <span>Results</span>
+        <span class="results-meta">${badge}</span>
+      </div>
+      <div style="padding:24px;color:var(--text-muted);font-size:0.88rem;text-align:center;">
+        The query returned no rows.
+      </div>
+    `;
+    area.appendChild(pane);
+    return;
+  }
+
+  // Build table rows, detect numeric columns
+  const numericCols = columns.map((_, ci) =>
+    rows.every(r => r[ci] === null || isNumeric(r[ci]))
+  );
+
+  const headerCells = columns.map(c =>
+    `<th>${c.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</th>`
+  ).join("");
+
+  const bodyRows = rows.map(row => {
+    const cells = row.map((v, ci) =>
+      `<td class="${numericCols[ci] ? "num-cell" : ""}">${formatCell(v)}</td>`
+    ).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  pane.innerHTML = `
+    <div class="pane-header">
+      <span>Results</span>
+      <span class="results-meta">${badge}</span>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
+  area.appendChild(pane);
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
