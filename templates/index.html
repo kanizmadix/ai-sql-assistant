@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI SQL Assistant</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    /* ── Base ────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --bg:          #0d1117;
       --surface:     #161b22;
@@ -18,6 +18,7 @@
       --green:       #3fb950;
       --red:         #f85149;
       --yellow:      #d29922;
+      --purple:      #bc8cff;
       --text:        #e6edf3;
       --text-muted:  #8b949e;
       --chip-bg:     #21262d;
@@ -25,656 +26,430 @@
       --radius:      8px;
       --font-mono:   "Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
     }
-
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
+    html, body { height: 100%; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 15px;
-      line-height: 1.6;
+      font-size: 14.5px; line-height: 1.55; }
+
+    .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    aside.sidebar { background: var(--surface); border-right: 1px solid var(--border);
+      padding: 18px 16px; overflow-y: auto; max-height: 100vh; position: sticky; top:0; }
+    aside.sidebar h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-muted); margin: 18px 0 8px; }
+    aside.sidebar h2:first-child { margin-top: 0; }
+    main.content { padding: 24px 28px 64px; max-width: 1200px; }
+
+    header.app-header { padding: 4px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    header.app-header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em;
+      display: flex; align-items: center; gap: 8px; }
+    header.app-header p { color: var(--text-muted); margin-top: 4px; font-size: 0.85rem; }
+
+    select, input, textarea, button { font-family: inherit; font-size: inherit; color: var(--text); }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+
+    .control {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      padding: 7px 10px; min-height: 32px;
     }
+    .control:focus { outline: none; border-color: var(--accent); }
 
-    /* ── Layout ──────────────────────────────────────────────────── */
-    .app {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 24px 48px;
-    }
+    textarea#question { width: 100%; min-height: 76px; resize: vertical;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 12px; }
+    textarea#question:focus { outline: none; border-color: var(--accent); }
 
-    header {
-      padding: 32px 0 24px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 28px;
-    }
-
-    header h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    header h1 .logo {
-      font-size: 1.4rem;
-    }
-
-    header p {
-      color: var(--text-muted);
-      margin-top: 4px;
-      font-size: 0.9rem;
-    }
-
-    /* ── Query input area ────────────────────────────────────────── */
-    .query-area {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .input-row {
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-    }
-
-    #question {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-size: 0.95rem;
-      padding: 12px 16px;
-      resize: vertical;
-      min-height: 52px;
-      transition: border-color 0.15s;
-      font-family: inherit;
-    }
-
-    #question:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.12);
-    }
-
-    #question::placeholder { color: var(--text-muted); }
-
-    #submit-btn {
-      background: var(--accent);
-      color: #0d1117;
-      border: none;
-      border-radius: var(--radius);
-      padding: 12px 22px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.15s, transform 0.1s;
-      flex-shrink: 0;
-      align-self: flex-start;
-    }
-
-    #submit-btn:hover { opacity: 0.88; }
-    #submit-btn:active { transform: scale(0.97); }
-    #submit-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-
-    /* ── Example chips ───────────────────────────────────────────── */
-    .examples-label {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
-    }
-
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .btn { background: var(--accent-dim); border: 1px solid var(--accent);
+      color: var(--text); padding: 7px 14px; border-radius: var(--radius);
+      cursor: pointer; transition: background .15s; }
+    .btn:hover { background: var(--accent); color: #0d1117; }
+    .btn.primary { background: var(--accent); color: #0d1117; }
+    .btn.primary:hover { filter: brightness(1.1); }
+    .btn.subtle { background: var(--chip-bg); border-color: var(--border); }
+    .btn.subtle:hover { background: var(--chip-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .chip {
-      background: var(--chip-bg);
+      display: inline-block; padding: 4px 10px; margin: 4px 6px 0 0;
+      background: var(--chip-bg); color: var(--text-muted);
+      border-radius: 14px; font-size: 0.8rem; cursor: pointer;
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 5px 14px;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
-      user-select: none;
     }
+    .chip:hover { background: var(--chip-hover); color: var(--text); }
+    .chip.accent { color: var(--accent); border-color: var(--accent-dim); }
 
-    .chip:hover {
-      background: var(--chip-hover);
-      color: var(--text);
-      border-color: var(--accent);
+    section.card { background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-top: 18px; }
+    section.card h3 { font-size: 0.95rem; margin-bottom: 10px; color: var(--text); }
+
+    pre.sql { font-family: var(--font-mono); font-size: 0.85rem;
+      background: #0a0e14; padding: 12px; border-radius: var(--radius);
+      border: 1px solid var(--border); overflow-x: auto; white-space: pre-wrap; }
+
+    table.results { width: 100%; border-collapse: collapse; font-size: 0.85rem;
+      font-family: var(--font-mono); }
+    table.results th, table.results td {
+      border: 1px solid var(--border); padding: 6px 10px; text-align: left;
     }
+    table.results thead { background: var(--surface2); }
+    table.results tbody tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 
-    /* ── Divider ─────────────────────────────────────────────────── */
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 24px 0;
-    }
+    .err { color: var(--red); }
+    .ok  { color: var(--green); }
+    .muted { color: var(--text-muted); }
 
-    /* ── Loading state ───────────────────────────────────────────── */
-    .status-bar {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      color: var(--text-muted);
-      font-size: 0.88rem;
-      padding: 10px 0;
-    }
+    .hist-item, .saved-item { padding: 8px 10px; border-radius: var(--radius);
+      cursor: pointer; border: 1px solid transparent; }
+    .hist-item:hover, .saved-item:hover { background: var(--chip-bg); border-color: var(--border); }
+    .hist-item small { color: var(--text-muted); display: block; }
 
-    .status-bar.visible { display: flex; }
+    .erd-wrap { background: var(--surface2); padding: 12px; border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: auto; }
+    .erd-wrap svg { max-width: 100%; }
 
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      flex-shrink: 0;
-    }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .pill { padding: 2px 8px; border-radius: 10px; background: var(--chip-bg);
+      color: var(--text-muted); font-size: 0.75rem; }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── SQL pane ────────────────────────────────────────────────── */
-    .pane {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-
-    .pane-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .pane-header .badge {
-      background: var(--accent-dim);
-      color: var(--accent);
-      border-radius: 4px;
-      padding: 2px 8px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0;
-      text-transform: none;
-    }
-
-    .pane-header .copy-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 3px 10px;
-      transition: background 0.15s, color 0.15s;
-    }
-
-    .pane-header .copy-btn:hover {
-      background: var(--chip-hover);
-      color: var(--text);
-    }
-
-    .sql-code {
-      font-family: var(--font-mono);
-      font-size: 0.88rem;
-      line-height: 1.7;
-      padding: 18px 20px;
-      white-space: pre-wrap;
-      word-break: break-all;
-      color: #e6edf3;
-    }
-
-    /* Very basic SQL keyword highlighting */
-    .kw   { color: #ff7b72; font-weight: 600; }
-    .fn   { color: #d2a8ff; }
-    .str  { color: #a5d6ff; }
-    .num  { color: #79c0ff; }
-    .cmt  { color: var(--text-muted); font-style: italic; }
-    .alias{ color: var(--green); }
-
-    /* ── Results table ───────────────────────────────────────────── */
-    .results-meta {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .results-meta .row-count {
-      color: var(--green);
-      font-weight: 600;
-    }
-
-    .table-wrapper {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-
-    thead th {
-      background: var(--surface2);
-      color: var(--text-muted);
-      font-weight: 600;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 10px 16px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.1s;
-    }
-
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
-
-    tbody td {
-      padding: 10px 16px;
-      color: var(--text);
-      max-width: 280px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    tbody td.num-cell {
-      font-family: var(--font-mono);
-      font-size: 0.84rem;
-      color: #79c0ff;
-    }
-
-    /* ── Error box ───────────────────────────────────────────────── */
-    .error-box {
-      background: rgba(248, 81, 73, 0.08);
-      border: 1px solid rgba(248, 81, 73, 0.35);
-      border-radius: var(--radius);
-      color: var(--red);
-      padding: 14px 18px;
-      font-size: 0.88rem;
-      display: none;
-    }
-
-    .error-box.visible { display: block; }
-
-    /* ── Empty / welcome state ───────────────────────────────────── */
-    .welcome {
-      text-align: center;
-      padding: 60px 0;
-      color: var(--text-muted);
-    }
-
-    .welcome .icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .welcome h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 6px; }
-    .welcome p  { font-size: 0.88rem; }
-
-    /* ── Schema panel (collapsible) ──────────────────────────────── */
-    details.schema-details {
-      margin-top: 8px;
-    }
-
-    details.schema-details summary {
-      cursor: pointer;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      user-select: none;
-      list-style: none;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 0;
-    }
-
-    details.schema-details summary::-webkit-details-marker { display: none; }
-    details.schema-details summary::before {
-      content: "▶";
-      font-size: 0.6rem;
-      transition: transform 0.2s;
-      display: inline-block;
-    }
-    details[open].schema-details summary::before { transform: rotate(90deg); }
-
-    details.schema-details summary:hover { color: var(--text); }
-
-    .schema-body {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      margin-top: 8px;
-      white-space: pre;
-      overflow-x: auto;
-    }
+    canvas#chart { max-height: 320px; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-<div class="app">
+<div class="layout">
+  <aside class="sidebar">
+    <h2>Database</h2>
+    <select id="dbSelect" class="control" style="width:100%"></select>
 
-  <header>
-    <h1><span class="logo">🗄️</span> AI SQL Assistant</h1>
-    <p>Ask questions in plain English — Claude generates the SQL and runs it instantly.</p>
-  </header>
+    <h2>Schema</h2>
+    <button id="btnShowErd" class="btn subtle" style="width:100%">View ERD</button>
+    <button id="btnShowSchema" class="btn subtle" style="width:100%; margin-top:6px">View Schema</button>
 
-  <!-- Query input -->
-  <div class="query-area">
-    <div class="input-row">
-      <textarea
-        id="question"
-        placeholder="e.g. Show me the top 5 customers by total spending"
-        rows="2"
-        autocomplete="off"
-        spellcheck="false"
-      ></textarea>
-      <button id="submit-btn" onclick="submitQuery()">Run Query</button>
+    <h2>History</h2>
+    <input id="histSearch" class="control" placeholder="Search history…" style="width:100%; margin-bottom:8px"/>
+    <div id="historyList"></div>
+
+    <h2>Saved</h2>
+    <div id="savedList"></div>
+  </aside>
+
+  <main class="content">
+    <header class="app-header">
+      <h1><span>SQL</span> AI Assistant</h1>
+      <p>Ask in plain English. Get SQL, results, charts, and follow-ups.</p>
+    </header>
+
+    <textarea id="question" placeholder="e.g. Show top 5 customers by spending"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="btnRun" class="btn primary">Run</button>
+      <button id="btnExamples" class="btn subtle">Examples</button>
+      <span id="status" class="muted"></span>
     </div>
+    <div id="examples" class="hidden" style="margin-top:8px"></div>
 
-    <!-- Example chips -->
-    <div>
-      <div class="examples-label">Try an example</div>
-      <div class="chips" id="chips-container"></div>
-    </div>
+    <section class="card hidden" id="resultCard">
+      <h3>SQL</h3>
+      <pre class="sql" id="sqlOut"></pre>
+      <div class="toolbar">
+        <button class="btn subtle" id="btnExplain">Explain</button>
+        <button class="btn subtle" id="btnOptimize">Optimize</button>
+        <button class="btn subtle" id="btnSave">Save</button>
+        <select id="exportFmt" class="control">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="markdown">Markdown</option>
+          <option value="excel">Excel</option>
+        </select>
+        <button class="btn subtle" id="btnExport">Export</button>
+        <span id="metaPills" class="row"></span>
+      </div>
+      <div id="errorBox" class="err"></div>
 
-    <!-- Schema viewer -->
-    <details class="schema-details" id="schema-details">
-      <summary>View database schema</summary>
-      <pre class="schema-body" id="schema-body">Loading…</pre>
-    </details>
-  </div>
+      <h3 style="margin-top:14px">Results</h3>
+      <div id="tableWrap" style="overflow:auto; max-height:380px"></div>
 
-  <hr class="divider" />
+      <h3 style="margin-top:18px">Chart</h3>
+      <div id="chartReason" class="muted" style="font-size:0.8rem"></div>
+      <canvas id="chart"></canvas>
 
-  <!-- Status / loading -->
-  <div class="status-bar" id="status-bar">
-    <div class="spinner"></div>
-    <span id="status-text">Generating SQL with Claude…</span>
-  </div>
+      <h3 style="margin-top:18px">Explain / Optimize</h3>
+      <div id="explainBox" class="muted"></div>
+      <div id="optimizeBox" class="muted"></div>
 
-  <!-- Error -->
-  <div class="error-box" id="error-box"></div>
+      <h3 style="margin-top:18px">Follow-up questions</h3>
+      <div id="followupChips"></div>
+    </section>
 
-  <!-- Results area -->
-  <div id="results-area">
-    <div class="welcome">
-      <div class="icon">✨</div>
-      <h2>Ask anything about the e-commerce data</h2>
-      <p>Customers · Products · Orders — 3 tables, 75+ rows of sample data</p>
-    </div>
-  </div>
+    <section class="card hidden" id="schemaCard">
+      <h3 id="schemaCardTitle">Schema</h3>
+      <pre class="sql" id="schemaOut"></pre>
+    </section>
 
+    <section class="card hidden" id="erdCard">
+      <h3>ER Diagram</h3>
+      <div class="erd-wrap"><div class="mermaid" id="erdMermaid"></div></div>
+    </section>
+  </main>
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-let schema = "";
+const $ = (s) => document.querySelector(s);
+const state = { db: 'ecommerce', last: null, chart: null };
 
-// ── Init ───────────────────────────────────────────────────────────────────
-async function init() {
-  await Promise.all([loadExamples(), loadSchema()]);
-  document.getElementById("question").addEventListener("keydown", e => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitQuery();
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
   });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`${r.status} ${r.statusText}: ${txt}`);
+  }
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('application/json') ? r.json() : r.blob();
+}
+
+async function loadDatabases() {
+  const data = await api('/databases');
+  const sel = $('#dbSelect');
+  sel.innerHTML = '';
+  for (const db of data.databases) {
+    const opt = document.createElement('option');
+    opt.value = db.name;
+    opt.textContent = `${db.name} (${(db.size_bytes/1024).toFixed(1)} KB)`;
+    sel.appendChild(opt);
+  }
+  sel.value = state.db;
+  sel.onchange = () => { state.db = sel.value; refreshSidebar(); };
+}
+
+async function refreshSidebar() {
+  await Promise.all([loadHistory(), loadSaved()]);
+}
+
+async function loadHistory() {
+  const q = $('#histSearch').value.trim();
+  const path = q ? `/history/search?q=${encodeURIComponent(q)}` : '/history?limit=30';
+  const items = await api(path);
+  const c = $('#historyList'); c.innerHTML = '';
+  for (const h of items) {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `<div>${escapeHtml(h.question.slice(0,60))}</div>
+                     <small>${new Date(h.created_at).toLocaleString()} · ${h.row_count} rows</small>`;
+    div.onclick = () => { $('#question').value = h.question; runQuery(); };
+    c.appendChild(div);
+  }
+}
+
+async function loadSaved() {
+  const items = await api('/saved');
+  const c = $('#savedList'); c.innerHTML = '';
+  for (const s of items) {
+    const div = document.createElement('div');
+    div.className = 'saved-item';
+    div.innerHTML = `<div>${escapeHtml(s.name)}</div>
+                     <small>${escapeHtml(s.db_name)}</small>`;
+    div.onclick = () => {
+      $('#sqlOut').textContent = s.sql;
+      $('#resultCard').classList.remove('hidden');
+    };
+    c.appendChild(div);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function renderTable(columns, rows) {
+  if (!columns.length) return '<div class="muted">No columns</div>';
+  let h = '<table class="results"><thead><tr>';
+  for (const c of columns) h += `<th>${escapeHtml(c)}</th>`;
+  h += '</tr></thead><tbody>';
+  for (const r of rows) {
+    h += '<tr>';
+    for (const v of r) h += `<td>${escapeHtml(v)}</td>`;
+    h += '</tr>';
+  }
+  return h + '</tbody></table>';
+}
+
+async function runQuery() {
+  const question = $('#question').value.trim();
+  if (!question) return;
+  $('#status').textContent = 'Running…';
+  try {
+    const data = await api('/query', {
+      method: 'POST',
+      body: JSON.stringify({ question, db_name: state.db }),
+    });
+    state.last = data;
+    showResult(data);
+    $('#status').innerHTML = `<span class="ok">OK</span> · ${data.row_count} rows · ${(data.duration_ms||0).toFixed(0)} ms`;
+    suggestChart(data);
+    suggestFollowups(question, data);
+    loadHistory();
+  } catch (e) {
+    $('#status').innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function showResult(data) {
+  $('#resultCard').classList.remove('hidden');
+  $('#sqlOut').textContent = data.sql;
+  $('#errorBox').textContent = data.error || '';
+  $('#tableWrap').innerHTML = renderTable(data.columns, data.results);
+  const pills = [
+    `<span class="pill">${data.db_name}</span>`,
+    `<span class="pill">${data.row_count} rows</span>`,
+    `<span class="pill">${(data.duration_ms||0).toFixed(0)} ms</span>`,
+  ];
+  $('#metaPills').innerHTML = pills.join('');
+  $('#explainBox').textContent = '';
+  $('#optimizeBox').innerHTML = '';
+}
+
+async function suggestChart(data) {
+  if (!data.columns.length || !data.results.length) return;
+  try {
+    const cfg = await api('/chart-suggest', {
+      method: 'POST',
+      body: JSON.stringify({ columns: data.columns, rows: data.results }),
+    });
+    drawChart(cfg);
+  } catch (e) { /* non-fatal */ }
+}
+
+function drawChart(cfg) {
+  const ctx = $('#chart');
+  if (state.chart) { state.chart.destroy(); state.chart = null; }
+  $('#chartReason').textContent = cfg.reason || '';
+  if (cfg.chart_type === 'table') return;
+  const colors = ['#58a6ff','#3fb950','#d29922','#bc8cff','#f85149','#39c5cf','#e8d44d'];
+  const datasets = (cfg.datasets || []).map((d, i) => ({
+    ...d,
+    backgroundColor: cfg.chart_type === 'pie'
+      ? (cfg.labels || []).map((_, k) => colors[k % colors.length])
+      : colors[i % colors.length],
+    borderColor: colors[i % colors.length],
+  }));
+  state.chart = new Chart(ctx, {
+    type: cfg.chart_type,
+    data: { labels: cfg.labels, datasets },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#e6edf3' } } },
+      scales: cfg.chart_type === 'pie' ? {} : {
+        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+      } },
+  });
+}
+
+async function suggestFollowups(question, data) {
+  const c = $('#followupChips'); c.innerHTML = '';
+  if (!data.results.length) return;
+  try {
+    const items = await api('/followup', {
+      method: 'POST',
+      body: JSON.stringify({ question, columns: data.columns, rows: data.results.slice(0,5) }),
+    });
+    for (const it of items) {
+      const chip = document.createElement('span');
+      chip.className = 'chip accent';
+      chip.textContent = it.question;
+      chip.title = it.rationale || '';
+      chip.onclick = () => { $('#question').value = it.question; runQuery(); };
+      c.appendChild(chip);
+    }
+  } catch (e) { /* non-fatal */ }
 }
 
 async function loadExamples() {
+  const data = await api('/examples');
+  const c = $('#examples'); c.innerHTML = '';
+  for (const ex of data.examples) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = ex;
+    chip.onclick = () => { $('#question').value = ex; runQuery(); };
+    c.appendChild(chip);
+  }
+  c.classList.remove('hidden');
+}
+
+$('#btnRun').onclick = runQuery;
+$('#btnExamples').onclick = loadExamples;
+$('#histSearch').oninput = () => { clearTimeout(window._hd); window._hd = setTimeout(loadHistory, 250); };
+
+$('#btnExplain').onclick = async () => {
+  if (!state.last) return;
+  $('#explainBox').textContent = 'Explaining…';
   try {
-    const res = await fetch("/examples");
-    const data = await res.json();
-    const container = document.getElementById("chips-container");
-    data.examples.forEach(ex => {
-      const chip = document.createElement("button");
-      chip.className = "chip";
-      chip.textContent = ex;
-      chip.onclick = () => {
-        document.getElementById("question").value = ex;
-        submitQuery();
-      };
-      container.appendChild(chip);
-    });
-  } catch (e) {
-    console.error("Could not load examples", e);
-  }
-}
+    const r = await api('/explain', { method: 'POST', body: JSON.stringify({ sql: state.last.sql, db_name: state.db }) });
+    $('#explainBox').textContent = r.explanation;
+  } catch (e) { $('#explainBox').innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`; }
+};
 
-async function loadSchema() {
+$('#btnOptimize').onclick = async () => {
+  if (!state.last) return;
+  $('#optimizeBox').textContent = 'Analyzing…';
   try {
-    const res = await fetch("/schema");
-    const data = await res.json();
-    schema = data.schema;
-    document.getElementById("schema-body").textContent = schema;
-  } catch (e) {
-    document.getElementById("schema-body").textContent = "Could not load schema.";
-  }
-}
+    const r = await api('/optimize', { method: 'POST', body: JSON.stringify({ sql: state.last.sql, db_name: state.db }) });
+    let h = '<ul>' + r.suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('') + '</ul>';
+    if (r.rewritten_sql) h += `<pre class="sql">${escapeHtml(r.rewritten_sql)}</pre>`;
+    $('#optimizeBox').innerHTML = h;
+  } catch (e) { $('#optimizeBox').innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`; }
+};
 
-// ── Submit ─────────────────────────────────────────────────────────────────
-async function submitQuery() {
-  const question = document.getElementById("question").value.trim();
-  if (!question) return;
+$('#btnSave').onclick = async () => {
+  if (!state.last) return;
+  const name = prompt('Name this saved query:');
+  if (!name) return;
+  await api('/saved', { method: 'POST', body: JSON.stringify({
+    name, db_name: state.db, sql: state.last.sql, description: $('#question').value,
+  }) });
+  loadSaved();
+};
 
-  setLoading(true);
-  clearError();
-  clearResults();
-
-  try {
-    const res = await fetch("/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showError(data.detail || "An error occurred.");
-      return;
-    }
-
-    if (data.error) {
-      renderSQL(data.sql);
-      showError(data.error);
-    } else {
-      renderSQL(data.sql);
-      renderResults(data.columns, data.results, data.row_count);
-    }
-  } catch (e) {
-    showError("Network error: " + e.message);
-  } finally {
-    setLoading(false);
-  }
-}
-
-// ── UI helpers ─────────────────────────────────────────────────────────────
-function setLoading(on) {
-  document.getElementById("submit-btn").disabled = on;
-  document.getElementById("status-bar").className = "status-bar" + (on ? " visible" : "");
-}
-
-function clearError() {
-  const box = document.getElementById("error-box");
-  box.className = "error-box";
-  box.textContent = "";
-}
-
-function showError(msg) {
-  const box = document.getElementById("error-box");
-  box.textContent = "⚠ " + msg;
-  box.className = "error-box visible";
-}
-
-function clearResults() {
-  document.getElementById("results-area").innerHTML = "";
-}
-
-// ── SQL rendering with basic syntax highlighting ───────────────────────────
-const KEYWORDS = [
-  "SELECT","FROM","WHERE","JOIN","LEFT","RIGHT","INNER","OUTER","ON","AND","OR",
-  "NOT","IN","LIKE","IS","NULL","AS","GROUP BY","ORDER BY","HAVING","LIMIT",
-  "OFFSET","DISTINCT","COUNT","SUM","AVG","MIN","MAX","CASE","WHEN","THEN",
-  "ELSE","END","WITH","UNION","ALL","BETWEEN","EXISTS","BY","DESC","ASC",
-  "GROUP","ORDER","CROSS","FULL",
-];
-
-function highlightSQL(sql) {
-  // Escape HTML first
-  let s = sql.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // Comments
-  s = s.replace(/(--[^\n]*)/g, '<span class="cmt">$1</span>');
-
-  // String literals
-  s = s.replace(/'([^']*)'/g, "<span class=\"str\">'$1'</span>");
-
-  // Numbers
-  s = s.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>');
-
-  // Keywords (longest first to avoid partial matches)
-  const sorted = [...KEYWORDS].sort((a, b) => b.length - a.length);
-  sorted.forEach(kw => {
-    const re = new RegExp("\\b(" + kw.replace(" ", "\\s+") + ")\\b", "gi");
-    s = s.replace(re, '<span class="kw">$1</span>');
+$('#btnExport').onclick = async () => {
+  if (!state.last) return;
+  const fmt = $('#exportFmt').value;
+  const r = await fetch(`/export/${fmt}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ columns: state.last.columns, rows: state.last.results, filename: 'results' }),
   });
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `results.${fmt === 'markdown' ? 'md' : fmt === 'excel' ? 'xlsx' : fmt}`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
-  // Function calls like COUNT( — highlight function name
-  s = s.replace(/\b([A-Z_][A-Z0-9_]*)\s*\(/gi, (m, fn) => {
-    if (KEYWORDS.includes(fn.toUpperCase())) return m;
-    return `<span class="fn">${fn}</span>(`;
-  });
+$('#btnShowSchema').onclick = async () => {
+  const data = await api(`/schema/${state.db}`);
+  $('#schemaCardTitle').textContent = `Schema (${state.db})`;
+  $('#schemaOut').textContent = data.schema;
+  $('#schemaCard').classList.remove('hidden');
+};
 
-  return s;
-}
-
-function renderSQL(sql) {
-  if (!sql) return;
-  const area = document.getElementById("results-area");
-  const pane = document.createElement("div");
-  pane.className = "pane";
-  pane.innerHTML = `
-    <div class="pane-header">
-      <span>Generated SQL</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span class="badge">Claude</span>
-        <button class="copy-btn" onclick="copySQL(this)">Copy</button>
-      </div>
-    </div>
-    <pre class="sql-code" id="sql-display">${highlightSQL(sql)}</pre>
-  `;
-  pane.querySelector(".copy-btn")._sql = sql;
-  area.appendChild(pane);
-}
-
-function copySQL(btn) {
-  navigator.clipboard.writeText(btn._sql).then(() => {
-    btn.textContent = "Copied!";
-    setTimeout(() => { btn.textContent = "Copy"; }, 1500);
-  });
-}
-
-// ── Results table ──────────────────────────────────────────────────────────
-function isNumeric(v) {
-  return typeof v === "number" || (typeof v === "string" && v !== "" && !isNaN(Number(v)));
-}
-
-function formatCell(v) {
-  if (v === null || v === undefined) return '<span style="color:var(--text-muted)">NULL</span>';
-  if (typeof v === "number") {
-    // Format currency-like numbers
-    if (Math.abs(v) >= 0.01 && String(v).includes(".")) {
-      return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    return v.toLocaleString("en-US");
+$('#btnShowErd').onclick = async () => {
+  const data = await api(`/schema/${state.db}/erd`);
+  $('#erdCard').classList.remove('hidden');
+  const el = $('#erdMermaid');
+  el.removeAttribute('data-processed');
+  el.innerHTML = data.mermaid;
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    await mermaid.run({ nodes: [el] });
   }
-  return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+};
 
-function renderResults(columns, rows, rowCount) {
-  const area = document.getElementById("results-area");
-
-  const pane = document.createElement("div");
-  pane.className = "pane";
-
-  const badge = rowCount > 0
-    ? `<span class="row-count">${rowCount} row${rowCount !== 1 ? "s" : ""}</span>`
-    : '<span style="color:var(--text-muted)">No results</span>';
-
-  if (rowCount === 0) {
-    pane.innerHTML = `
-      <div class="pane-header">
-        <span>Results</span>
-        <span class="results-meta">${badge}</span>
-      </div>
-      <div style="padding:24px;color:var(--text-muted);font-size:0.88rem;text-align:center;">
-        The query returned no rows.
-      </div>
-    `;
-    area.appendChild(pane);
-    return;
-  }
-
-  // Build table rows, detect numeric columns
-  const numericCols = columns.map((_, ci) =>
-    rows.every(r => r[ci] === null || isNumeric(r[ci]))
-  );
-
-  const headerCells = columns.map(c =>
-    `<th>${c.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</th>`
-  ).join("");
-
-  const bodyRows = rows.map(row => {
-    const cells = row.map((v, ci) =>
-      `<td class="${numericCols[ci] ? "num-cell" : ""}">${formatCell(v)}</td>`
-    ).join("");
-    return `<tr>${cells}</tr>`;
-  }).join("");
-
-  pane.innerHTML = `
-    <div class="pane-header">
-      <span>Results</span>
-      <span class="results-meta">${badge}</span>
-    </div>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr>${headerCells}</tr></thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
-    </div>
-  `;
-  area.appendChild(pane);
-}
-
-// ── Bootstrap ──────────────────────────────────────────────────────────────
-init();
+(async function init() {
+  await loadDatabases();
+  await refreshSidebar();
+})();
 </script>
 </body>
 </html>
