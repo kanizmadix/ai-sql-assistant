@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  sql-assistant:
+    build: .
+    image: ai-sql-assistant:latest
+    container_name: ai-sql-assistant
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MODEL: ${MODEL:-claude-sonnet-4-6}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATA_DB_PATH: /app/ecommerce.db
+      META_DB_PATH: /app/metadata.db
+    volumes:
+      - sqldata:/app
+    restart: unless-stopped
+
+volumes:
+  sqldata:
