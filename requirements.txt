@@ -2,3 +2,10 @@ fastapi
 uvicorn[standard]
 anthropic
 python-multipart
+pydantic
+pydantic-settings
+openpyxl
+pytest
+pytest-asyncio
+httpx
+ruff
