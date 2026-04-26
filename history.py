@@ -8,13 +8,12 @@ read-only as far as the user-facing API is concerned.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Iterator
 
 from config import settings
 from models import QueryHistoryRecord, SavedQuery
-
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS query_history (

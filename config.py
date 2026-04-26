@@ -7,11 +7,9 @@ Values can be overridden through environment variables or a `.env` file.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 _BASE_DIR = Path(__file__).resolve().parent
 
@@ -52,7 +50,7 @@ class Settings(BaseSettings):
 
     # ── Multi-DB registry ────────────────────────────────────────────────────
     @property
-    def ALLOWED_DBS(self) -> Dict[str, str]:
+    def ALLOWED_DBS(self) -> dict[str, str]:
         """Mapping of DB short-name -> filesystem path."""
         return {
             "ecommerce": self.DATA_DB_PATH,

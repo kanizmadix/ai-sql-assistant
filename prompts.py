@@ -7,7 +7,6 @@ and ensures the cached prefix is identical across requests.
 
 from __future__ import annotations
 
-
 SQL_GENERATOR_SYSTEM = """You are an expert SQL assistant for a SQLite e-commerce database.
 Your job is to convert natural language questions into accurate, read-only SELECT queries.
 

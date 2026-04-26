@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from models import SchemaSummary
 
-
 _TYPE_FALLBACK = "TEXT"
 
 

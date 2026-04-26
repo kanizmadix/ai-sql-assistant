@@ -3,8 +3,8 @@ SQLite database setup and safe query execution.
 Only SELECT statements are permitted — all write operations are blocked.
 """
 
-import sqlite3
 import re
+import sqlite3
 from typing import Any
 
 DB_PATH = "ecommerce.db"
@@ -87,7 +87,7 @@ def get_schema() -> str:
     for table in tables:
         # Get CREATE TABLE statement
         create_cursor = conn.execute(
-            f"SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
         )
         create_row = create_cursor.fetchone()
         if create_row:

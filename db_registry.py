@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from typing import Iterable
+from collections.abc import Iterable
 
 from config import settings
 from exceptions import DatabaseNotFound

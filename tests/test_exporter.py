@@ -8,7 +8,6 @@ import pytest
 
 from exporter import export, to_csv, to_json, to_markdown
 
-
 COLUMNS = ["id", "name", "qty"]
 ROWS = [[1, "a", 10], [2, "b", 20]]
 
@@ -29,7 +28,8 @@ def test_json_export_is_list_of_dicts() -> None:
 
 def test_markdown_export_has_separator_row() -> None:
     blob = to_markdown(COLUMNS, ROWS).decode("utf-8")
-    assert "| --- |" in blob.replace(" ", "")
+    compact = blob.replace(" ", "")
+    assert "|---|---|---|" in compact
     assert "| a |" in blob
 
 

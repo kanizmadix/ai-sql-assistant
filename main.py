@@ -20,22 +20,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
+import history
+from charts import suggest_chart
 from config import settings
 from db import execute_query as execute_local_query
 from db_registry import (
     get_connection as registry_conn,
+)
+from db_registry import (
     get_schema as registry_get_schema,
+)
+from db_registry import (
     list_databases as registry_list,
 )
-import exceptions as exc_mod
 from exceptions import (
     DatabaseNotFound,
-    QueryFailed,
-    UnsafeQuery,
     install_handlers,
 )
-import history
-from charts import suggest_chart
 from exporter import CONTENT_TYPES, EXTENSIONS, export
 from followup import suggest_followup_questions
 from logger import get_logger

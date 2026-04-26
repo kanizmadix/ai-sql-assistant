@@ -8,6 +8,10 @@ select = ["E", "F", "W", "I", "B", "UP"]
 ignore = [
     "E501",  # line length handled by formatter
     "B008",  # FastAPI's Depends() pattern
+    "B904",  # raise-from chaining not required for HTTPExceptions
+    "B905",  # zip() without strict — codebase-wide style choice
+    "E741",  # ambiguous variable names tolerated
+    "UP037", # quoted annotation false positives in dataclass-like contexts
 ]
 
 [tool.ruff.lint.per-file-ignores]

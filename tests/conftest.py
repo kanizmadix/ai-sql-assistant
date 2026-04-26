@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -23,6 +22,7 @@ def temp_meta_db(tmp_path, monkeypatch):
 
     # Reload settings so the new env var takes effect
     import importlib
+
     import config
     importlib.reload(config)
     import history
