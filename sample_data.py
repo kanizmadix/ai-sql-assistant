@@ -182,7 +182,7 @@ def seed_categories(conn: sqlite3.Connection) -> dict[str, int]:
         cats,
     )
     conn.commit()
-    return {row["name"]: row["id"] for row in conn.execute("SELECT id, name FROM categories")}
+    return {row[1]: row[0] for row in conn.execute("SELECT id, name FROM categories")}
 
 
 def seed_suppliers(conn: sqlite3.Connection, n: int = 15) -> list[int]:
