@@ -1,0 +1,43 @@
+name: Deploy showcase page
+
+# Publishes the static overview in host/ to GitHub Pages.
+# This workflow only ever reads host/ — it does not build, test, or touch the
+# application code, and it stays out of the way of the existing CI workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "host/**"
+      - ".github/workflows/pages.yml"
+  # Manual re-deploy from the Actions tab without needing a new commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a publish midway; queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - name: Upload host/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: host
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
