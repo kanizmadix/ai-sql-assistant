@@ -161,3 +161,9 @@ Environment variables (see `.env.example`):
 ## License
 
 MIT.
+
+## Live Project Guide
+
+Explore the architecture, safety model, API surface, stack and verified local setup steps at **https://kanizmadix.github.io/ai-sql-assistant/**.
+
+The hosted page is a static project overview. To generate or explain SQL, clone this repository and run the FastAPI application with your own `ANTHROPIC_API_KEY`; no private key is embedded in the hosted page.
